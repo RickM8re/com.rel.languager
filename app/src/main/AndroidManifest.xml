@@ -1,54 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
     <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
 
     <application
-        android:label="@string/app_name"
-        android:supportsRtl="true"
         android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
-        android:theme="@style/AppTheme" >
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
 
-        <meta-data
-            android:name="xposedmodule"
-            android:value="true" />
-
-        <meta-data
-            android:name="xposeddescription"
-            android:value="Force English language in selected apps" />
-
-        <meta-data
-            android:name="xposedsharedprefs"
-            android:value="true" />
-
-        <meta-data
-            android:name="xposedminversion"
-            android:value="93" />
-
-        <meta-data
-            android:name="xposedscope"
-            android:resource="@array/module_scope" />
-
-        <activity 
+        <activity
             android:name=".ActivityMain"
             android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-
         <activity
             android:name=".LanguageSelectionActivity"
             android:exported="false"
-            android:theme="@style/AppTheme" />
-
-        <!--Guide at: https://infinum.com/the-capsized-eight/share-files-using-fileprovider-->
+            android:theme="@style/AppTheme"/> <!-- Guide at: https://infinum.com/the-capsized-eight/share-files-using-fileprovider -->
         <provider
-            android:authorities="${applicationId}"
             android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
@@ -56,4 +35,5 @@
                 android:resource="@xml/provider_paths"/>
         </provider>
     </application>
+
 </manifest>

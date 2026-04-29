@@ -1,10 +1,9 @@
 package com.rel.languager
 
-import android.app.Activity
+import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.EditText
@@ -19,23 +18,19 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import android.widget.Button
+import android.widget.Toast
 import com.google.android.material.snackbar.Snackbar
 import com.rel.languager.Constants.PREF_APP_LANGUAGE_MAP
-import com.rel.languager.Constants.SHARED_PREF_FILE_NAME
+import io.github.libxposed.service.XposedService
+import io.github.libxposed.service.XposedServiceHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import androidx.core.content.edit
 
 class ActivityMain : AppCompatActivity() {
-    private val pref by lazy {
-        try {
-            getSharedPreferences(SHARED_PREF_FILE_NAME, MODE_WORLD_READABLE)
-        } catch (_: Exception) {
-            null
-        }
-    }
+    private var pref: SharedPreferences? = null
 
     private lateinit var appListRecyclerView: RecyclerView
     private lateinit var searchView: SearchView
@@ -47,20 +42,42 @@ class ActivityMain : AppCompatActivity() {
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private var hasUnsavedChanges = false
 
+    private var mXposedService: XposedService? = null
+
+    private val serviceListener = object : XposedServiceHelper.OnServiceListener {
+
+        // 框架绑定成功时触发
+        override fun onServiceBind(service: XposedService) {
+            mXposedService = service
+            pref = service.getRemotePreferences("SHARED_PREF_FILE_NAME")
+            alertDialog.dismiss()
+        }
+
+        // 框架服务意外断开/死亡时触发
+        override fun onServiceDied(service: XposedService) {
+            mXposedService = null
+        }
+    }
+
+    lateinit var alertDialog: AlertDialog
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
+        alertDialog = AlertDialog.Builder(this)
+            .setMessage(R.string.module_not_enabled)
+            .setPositiveButton(R.string.close) { _, _ -> finish() }
+            .setCancelable(false).create()
+        XposedServiceHelper.registerListener(serviceListener)
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
 
         if (pref == null) {
-            AlertDialog.Builder(this)
-                .setMessage(R.string.module_not_enabled)
-                .setPositiveButton(R.string.close) { _, _ -> finish() }
-                .setCancelable(false)
-                .show()
-            return
+            try {
+                alertDialog.show()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         initializeViews()
@@ -153,23 +170,48 @@ class ActivityMain : AppCompatActivity() {
 
     private fun saveLanguageMappings() {
         try {
+            val addingScope = mutableListOf<String>()
             pref?.let { preferences ->
-                val editor = preferences.edit()
+                preferences.edit {
 
-                val allPrefs = preferences.all
-                for (key in allPrefs.keys) {
-                    if (key != Constants.PREF_APP_LANGUAGE_MAP) {
-                        editor.remove(key)
+                    val allPrefs = preferences.all
+                    for (key in allPrefs.keys) {
+                        if (key == PREF_APP_LANGUAGE_MAP) {
+                            remove(key)
+                        }
                     }
-                }
 
-                for ((packageName, languageCode) in languageMappings) {
-                    if (languageCode != Constants.DEFAULT_LANGUAGE) {
-                        editor.putString(packageName, languageCode)
+                    for ((packageName, languageCode) in languageMappings) {
+                        if (languageCode != Constants.DEFAULT_LANGUAGE) {
+                            putString(packageName, languageCode)
+                            addingScope.add(packageName)
+                        }
+                        else{
+                            remove(packageName)
+                        }
                     }
-                }
 
-                editor.apply()
+                }
+                mXposedService?.apply {
+                    val requestingScope = addingScope.minus(scope)
+                    requestScope(requestingScope, object : XposedService.OnScopeEventListener {
+                        override fun onScopeRequestApproved(approved: List<String?>) {
+                            Toast.makeText(
+                                this@ActivityMain,
+                                "Added success",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+
+                        override fun onScopeRequestFailed(message: String) {
+                            Toast.makeText(
+                                this@ActivityMain,
+                                "Denied scope request, make sure added manually later.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    })
+                }
             }
 
             Snackbar.make(
@@ -261,7 +303,7 @@ class ActivityMain : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
-        if (requestCode == AppLanguageAdapter.REQUEST_LANGUAGE_SELECTION && resultCode == Activity.RESULT_OK) {
+        if (requestCode == AppLanguageAdapter.REQUEST_LANGUAGE_SELECTION && resultCode == RESULT_OK) {
             data?.getStringExtra(LanguageSelectionActivity.RESULT_LANGUAGE_CODE)?.let { languageCode ->
                 // Get the package name from the data
                 val packageName = data.getStringExtra(LanguageSelectionActivity.EXTRA_PACKAGE_NAME) ?: return@let
