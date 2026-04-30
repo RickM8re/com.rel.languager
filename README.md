@@ -9,6 +9,7 @@ Languager is an Xposed module that allows you to change the language of specific
 - **User-Friendly Interface**: Easy-to-use UI with app search functionality and intuitive language selection
 - **Wide Compatibility**: Works on Android 8.0+ (API 26+) with support for both older and newer Android versions
 - **Efficient Hooking Mechanism**: Hooks all locale-related methods to ensure complete language spoofing
+- **Dynamic Scope Request**: After saved configurations, automatically request scope when app not in the LSPosed scope
 
 ## Technical Details
 - **Language Spoofing Mechanism**:
@@ -25,20 +26,19 @@ Languager is an Xposed module that allows you to change the language of specific
   - Handles API differences between Android versions
 
 - **Shared Preferences**:
-  - Uses XSharedPreferences for cross-process configuration storage
-  - Implements world-readable preferences for Xposed module access
+  - Uses RemoteSharedPreferences for cross-process configuration storage
   - Direct key-value storage for app-language mappings
 
 ## Requirements
-- Android device with Xposed framework installed (LSPosed, EdXposed, etc.)
+- Android device with Xposed framework installed (LSPosed, Vector, etc.)
 - Android 8.0+ (API 26+)
 
 ## Installation
 1. Install the Languager APK
 2. Enable the module in your Xposed framework manager
-3. Select the apps you want to apply language spoofing to
-4. Reboot your device
-5. Open the Languager app to configure language settings for each app
+3. Open the Languager app to configure language settings for each app
+4. Save configuration and approve scope request
+5. Force stop target app and reopen
 
 ### LSPosed Repository Installation
 You can also install Languager directly from the LSPosed repository:
@@ -46,7 +46,7 @@ You can also install Languager directly from the LSPosed repository:
 2. Go to Repository tab
 3. Add the repository URL: `https://mon231.github.io/com.rel.languager`
 4. Find Languager in the list and install it
-5. Enable the module and reboot
+5. Enable the module
 
 ## Usage
 1. Open the Languager app
@@ -62,7 +62,7 @@ In addition, some apps are installed via split-apk and do not have the language 
 To bypass such apps and use your prefered language, temporarly switch your system-language, reinstall the app then select language in `Languager`.
 
 ## Implementation Details
-- **Preference Handling**: Uses `MODE_WORLD_READABLE` with LSPosed's `xposedsharedprefs` flag for secure preference sharing
+- **Preference Handling**: Uses LSPosed's `RemoteSharedPreference`
 - **Dynamic Locale Creation**: Creates locale objects for all supported languages
 - **API Level Detection**: Automatically detects device API level and uses appropriate hooking methods
 - **UI Optimization**: Efficient app list loading with search functionality
@@ -72,8 +72,8 @@ To bypass such apps and use your prefered language, temporarly switch your syste
 
 ### Prerequisites
 - Android Studio 4.0+
-- JDK 11+
-- Gradle 7.0+
+- JDK 17+
+- Gradle 8.14+
 
 ### Local Build (debug-mode)
 1. Clone the repository:
@@ -94,5 +94,5 @@ To bypass such apps and use your prefered language, temporarly switch your syste
 - **Language not changing**: Try restarting the app or rebooting your device
 
 ## Acknowledgements
-- [Xposed Framework](https://github.com/rovo89/XposedBridge)
+
 - [LSPosed Framework](https://github.com/LSPosed/LSPosed)
