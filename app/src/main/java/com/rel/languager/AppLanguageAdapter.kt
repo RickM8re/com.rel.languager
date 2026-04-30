@@ -1,29 +1,27 @@
 package com.rel.languager
 
-import java.util.Locale
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
-import android.content.Context
 import android.widget.ImageView
-import android.view.LayoutInflater
-import android.content.Intent
-import android.app.Activity
-import android.content.pm.PackageManager
-import android.content.pm.ApplicationInfo
+import android.widget.TextView
+import androidx.activity.result.ActivityResultLauncher
 import androidx.recyclerview.widget.RecyclerView
+import java.util.*
 
 class AppLanguageAdapter(
     private val context: Context,
     private var appList: List<ApplicationInfo>,
     private val languageMappings: MutableMap<String, String>,
-    private val onLanguageSelected: (String, String) -> Unit
+    private val languageSelectionLauncher: ActivityResultLauncher<Intent?>,
 ) : RecyclerView.Adapter<AppLanguageAdapter.ViewHolder>() {
-    companion object {
-        const val REQUEST_LANGUAGE_SELECTION = 1001
-    }
 
-    inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val appIcon: ImageView = view.findViewById(R.id.app_icon)
         val appName: TextView = view.findViewById(R.id.app_name)
         val packageName: TextView = view.findViewById(R.id.package_name)
@@ -52,10 +50,12 @@ class AppLanguageAdapter(
         } else {
             // Try to find a matching locale to display the full name and code
             val locale = Locale.forLanguageTag(currentLanguageCode)
+            @SuppressLint("SetTextI18n")
             holder.languageText.text = "${locale.displayName} (${currentLanguageCode})"
         }
 
         // Set click listener to open language selection activity
+
         holder.itemView.setOnClickListener {
             if (context is Activity) {
                 val intent = Intent(context, LanguageSelectionActivity::class.java).apply {
@@ -63,7 +63,7 @@ class AppLanguageAdapter(
                     putExtra(LanguageSelectionActivity.EXTRA_APP_NAME, app.loadLabel(packageManager).toString())
                     putExtra(LanguageSelectionActivity.EXTRA_CURRENT_LANGUAGE, currentLanguageCode)
                 }
-                context.startActivityForResult(intent, REQUEST_LANGUAGE_SELECTION)
+                languageSelectionLauncher.launch(intent)
             }
         }
     }
@@ -72,6 +72,7 @@ class AppLanguageAdapter(
 
     fun updateList(newList: List<ApplicationInfo>) {
         appList = newList
+        @SuppressLint("NotifyDataSetChanged")
         notifyDataSetChanged()
     }
 }
