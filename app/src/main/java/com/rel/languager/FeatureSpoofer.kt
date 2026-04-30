@@ -13,15 +13,15 @@ import java.util.*
 
 class FeatureSpoofer : XposedModule() {
     private fun log(message: String, tr: Throwable? = null) {
-        log(Log.INFO, null, "[Languager] $message", tr)
+        log(Log.ERROR, null, "[Languager] $message", tr)
     }
 
     private val pref by lazy {
         getRemotePreferences(SHARED_PREF_FILE_NAME)
     }
 
-    override fun onPackageLoaded(lpparam: XposedModuleInterface.PackageLoadedParam) {
-        lpparam.packageName.let { packageName ->
+    override fun onPackageReady(param: XposedModuleInterface.PackageReadyParam) {
+        param.packageName.let { packageName ->
             if (packageName == BuildConfig.APPLICATION_ID) {
                 return
             }
@@ -33,16 +33,16 @@ class FeatureSpoofer : XposedModule() {
             }
 
             // Use Locale.forLanguageTag for long language codes
-            hookLocaleAPIs(lpparam, Locale.forLanguageTag(languageCode))
+            hookLocaleAPIs(param, Locale.forLanguageTag(languageCode))
         }
     }
 
-    private fun hookLocaleAPIs(lpparam: XposedModuleInterface.PackageLoadedParam, locale: Locale) {
+    private fun hookLocaleAPIs(param: XposedModuleInterface.PackageReadyParam, locale: Locale) {
         try {
-            hookCommonLocaleAPIs(lpparam, locale)
-            hookApi24PlusLocaleAPIs(lpparam, locale)
+            hookCommonLocaleAPIs(param, locale)
+            hookApi24PlusLocaleAPIs(param, locale)
         } catch (e: Exception) {
-            log("Error during hooking process: ${e.message}")
+            log("Error during hooking process: ${e.message}", e)
             e.printStackTrace()
         }
     }
@@ -99,13 +99,14 @@ class FeatureSpoofer : XposedModule() {
     }
 
     private fun hookCommonLocaleAPIs(
-        lpparam: XposedModuleInterface.PackageLoadedParam,
+        param: XposedModuleInterface.PackageReadyParam,
         locale: Locale
     ) {
+        val classLoader = param.classLoader
         try {
             hook(
                 findMethod(
-                    Locale::class.java,
+                    classLoader.loadClass(Locale::class.java.name),
                     "getDefault",
                 )
             ).intercept {
@@ -116,7 +117,7 @@ class FeatureSpoofer : XposedModule() {
         }
 
         try {
-            hook(findMethod(Resources::class.java, "getConfiguration")).intercept {
+            hook(findMethod(classLoader.loadClass(Resources::class.java.name), "getConfiguration")).intercept {
                 val conf = it.proceed() as Configuration
                 findField<Configuration>("locale").set(conf, locale)
                 return@intercept conf
@@ -128,7 +129,7 @@ class FeatureSpoofer : XposedModule() {
         try {
             hook(
                 findMethod(
-                    Resources::class.java, "updateConfiguration",
+                    classLoader.loadClass(Resources::class.java.name), "updateConfiguration",
                     Configuration::class.java, android.util.DisplayMetrics::class.java
                 )
             ).intercept {
@@ -141,7 +142,12 @@ class FeatureSpoofer : XposedModule() {
         }
 
         try {
-            hook(findMethod(Configuration::class.java, "setLocale", Locale::class.java)).intercept {
+            hook(
+                findMethod(
+                    classLoader.loadClass(Configuration::class.java.name),
+                    "setLocale", Locale::class.java
+                )
+            ).intercept {
                 findField<Configuration>("locale").set(it.thisObject, locale)
                 it.proceed()
             }
@@ -152,7 +158,7 @@ class FeatureSpoofer : XposedModule() {
 
 
         try {
-            hook(findMethod(Resources::class.java, "getSystem")).intercept {
+            hook(findMethod(classLoader.loadClass(Resources::class.java.name), "getSystem")).intercept {
                 val resources = it.proceed() as Resources
                 setField(resources.configuration, "locale", locale)
                 resources
@@ -162,7 +168,7 @@ class FeatureSpoofer : XposedModule() {
         }
 
         try {
-            hook(findMethod(Configuration::class.java, "<init>")).intercept {
+            hook(findMethod(classLoader.loadClass(Configuration::class.java.name), "<init>")).intercept {
                 it.thisObject.setObjField("locale", locale)
                 it.proceed()
             }
@@ -172,12 +178,19 @@ class FeatureSpoofer : XposedModule() {
     }
 
     private fun hookApi24PlusLocaleAPIs(
-        lpparam: XposedModuleInterface.PackageLoadedParam,
+        param: XposedModuleInterface.PackageReadyParam,
         locale: Locale
     ) {
+        val classLoader = param.classLoader
         try {
 
-            hook(findMethod(Locale::class.java, "getDefault", Locale.Category::class.java)).intercept {
+            hook(
+                findMethod(
+                    classLoader.loadClass(Locale::class.java.name),
+                    "getDefault",
+                    Locale.Category::class.java
+                )
+            ).intercept {
                 return@intercept locale
             }
         } catch (e: Throwable) {
@@ -186,9 +199,13 @@ class FeatureSpoofer : XposedModule() {
 
         try {
 
-            hook(findMethod(Configuration::class.java, "getLocales")).intercept {
+            hook(findMethod(classLoader.loadClass(Configuration::class.java.name), "getLocales")).intercept {
                 val constructor =
-                    findMethod(android.os.LocaleList::class.java, "<init>", Array<Locale>::class.java) as Constructor<*>
+                    findMethod(
+                        classLoader.loadClass(android.os.LocaleList::class.java.name),
+                        "<init>",
+                        Array<Locale>::class.java
+                    ) as Constructor<*>
                 constructor.newInstance(arrayOf(locale))
             }
         } catch (e: Throwable) {
@@ -196,15 +213,28 @@ class FeatureSpoofer : XposedModule() {
         }
 
         try {
-            hook(findMethod(Configuration::class.java, "setLocales", android.os.LocaleList::class.java)).intercept {
-                it.proceed(arrayOf(android.os.LocaleList(locale)))
+            hook(
+                findMethod(
+                    classLoader.loadClass(Configuration::class.java.name),
+                    "setLocales",
+                    android.os.LocaleList::class.java
+                )
+            ).intercept {
+
+                it.proceed(
+                    arrayOf(
+                        classLoader.loadClass(android.os.LocaleList::class.java.name)
+                            .getConstructor(android.os.LocaleList::class.java)
+                            .newInstance(android.os.LocaleList(locale))
+                    )
+                )
             }
         } catch (e: Throwable) {
             log("Error hooking Configuration.setLocales: ${e.message}")
         }
 
         try {
-            hook(findMethod(android.os.LocaleList::class.java, "getDefault")).intercept {
+            hook(findMethod(classLoader.loadClass(android.os.LocaleList::class.java.name), "getDefault")).intercept {
                 return@intercept android.os.LocaleList(locale)
             }
         } catch (e: Throwable) {
@@ -213,7 +243,12 @@ class FeatureSpoofer : XposedModule() {
 
         try {
 
-            hook(findMethod(android.os.LocaleList::class.java, "getAdjustedDefault")).intercept {
+            hook(
+                findMethod(
+                    classLoader.loadClass(android.os.LocaleList::class.java.name),
+                    "getAdjustedDefault"
+                )
+            ).intercept {
                 return@intercept android.os.LocaleList(locale)
             }
         } catch (e: Throwable) {

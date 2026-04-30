@@ -1,24 +1,24 @@
 package com.rel.languager
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.view.View
+import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import android.widget.Button
-import android.widget.Toast
 import com.google.android.material.snackbar.Snackbar
 import com.rel.languager.Constants.PREF_APP_LANGUAGE_MAP
 import io.github.libxposed.service.XposedService
@@ -27,7 +27,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.core.content.edit
 
 class ActivityMain : AppCompatActivity() {
     private var pref: SharedPreferences? = null
@@ -51,6 +50,12 @@ class ActivityMain : AppCompatActivity() {
             mXposedService = service
             pref = service.getRemotePreferences("SHARED_PREF_FILE_NAME")
             alertDialog.dismiss()
+            (appListRecyclerView.adapter as? AppLanguageAdapter)?.notifyDataSetChanged()
+
+            runOnUiThread {
+                loadLanguageMappings()
+                loadEnabledApps()
+            }
         }
 
         // 框架服务意外断开/死亡时触发
@@ -82,8 +87,6 @@ class ActivityMain : AppCompatActivity() {
 
         initializeViews()
         setupListeners()
-        loadLanguageMappings()
-        loadEnabledApps()
 
         setupBackPressHandling()
     }
@@ -185,8 +188,7 @@ class ActivityMain : AppCompatActivity() {
                         if (languageCode != Constants.DEFAULT_LANGUAGE) {
                             putString(packageName, languageCode)
                             addingScope.add(packageName)
-                        }
-                        else{
+                        } else {
                             remove(packageName)
                         }
                     }
@@ -275,7 +277,7 @@ class ActivityMain : AppCompatActivity() {
         val installedApps = pm.getInstalledApplications(0)
 
         return@withContext installedApps.filter { app ->
-            app.enabled && !app.packageName.equals(packageName)
+            app.enabled && !app.packageName.equals(packageName) && (app.flags and ApplicationInfo.FLAG_HAS_CODE) != 0
         }.sortedBy {
             pm.getApplicationLabel(it).toString().lowercase()
         }

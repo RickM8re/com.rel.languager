@@ -13,7 +13,7 @@ object LanguageUtils {
         val map = mutableMapOf<String, String>()
 
         for ((key, value) in prefs.all) {
-            if (value is String && key != com.rel.languager.Constants.PREF_APP_LANGUAGE_MAP) {
+            if (value is String && key != Constants.PREF_APP_LANGUAGE_MAP) {
                 map[key] = value
             }
         }

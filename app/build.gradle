@@ -6,7 +6,7 @@ plugins {
 android {
     compileSdk 36
     defaultConfig {
-        applicationId "com.rel.languager.debug"
+        applicationId "com.rel.languager"
         minSdk 26
         targetSdk 36
         versionCode 10

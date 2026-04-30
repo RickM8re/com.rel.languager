@@ -7,7 +7,7 @@ Languager is an Xposed module that allows you to change the language of specific
 - **Per-App Language Selection**: Choose a different language for each app independently
 - **Comprehensive Language Support**: 26+ languages available including English, French, German, Spanish, Italian, Portuguese, Russian, Chinese, Japanese, Korean, Arabic, Hebrew, Hindi, and many more
 - **User-Friendly Interface**: Easy-to-use UI with app search functionality and intuitive language selection
-- **Wide Compatibility**: Works on Android 5.0+ (API 21+) with support for both older and newer Android versions
+- **Wide Compatibility**: Works on Android 8.0+ (API 26+) with support for both older and newer Android versions
 - **Efficient Hooking Mechanism**: Hooks all locale-related methods to ensure complete language spoofing
 
 ## Technical Details
@@ -15,7 +15,6 @@ Languager is an Xposed module that allows you to change the language of specific
   - Uses Xposed framework for comprehensive method hooking
   - Targets all locale-related methods across different API levels:
     - `Configuration.getLocales()` (API 24+)
-    - `Configuration.getLocale()` (API < 24)
     - `Configuration.locale` property
     - `Resources.getConfiguration().locale`
     - `Locale.getDefault()`
@@ -32,7 +31,7 @@ Languager is an Xposed module that allows you to change the language of specific
 
 ## Requirements
 - Android device with Xposed framework installed (LSPosed, EdXposed, etc.)
-- Android 5.0+ (API 21+)
+- Android 8.0+ (API 26+)
 
 ## Installation
 1. Install the Languager APK
