@@ -1,4 +1,5 @@
 package com.rel.languager
+
 import com.rel.languager.Constants.DEFAULT_LANGUAGE
 
 import java.util.Locale
@@ -22,17 +23,25 @@ object LanguageUtils {
     }
 
     fun getAvailableLanguages(): List<Locale> {
-        val localeList = Locale.getAvailableLocales().toMutableList()
+        val localeList = Locale.getAvailableLocales()
 
         // Filter out locales with empty language tags and sort by display name
         val filteredList = localeList.filter { it.toLanguageTag().isNotEmpty() && it.toLanguageTag() != "und" }
-        val sortedList = filteredList.sortedBy { it.getDisplayName(Locale.getDefault()) }
-
-        // Add default locale at the beginning
-        val resultList = mutableListOf<Locale>()
-        resultList.add(Locale.getDefault())
-        resultList.addAll(sortedList)
-
-        return resultList.distinct().toMutableList()
+        val sortedList = filteredList.distinct().sortedBy { it.getDisplayName(Locale.getDefault()) }
+        return sortedList.toMutableList().apply {
+            sortBy {
+                when (it) {
+                    Locale.ENGLISH -> 1
+                    Locale.CHINESE -> 2
+                    Locale.FRENCH -> 3
+                    Locale.JAPANESE -> 4
+                    Locale.GERMAN -> 5
+                    Locale.KOREAN -> 6
+                    Locale.ITALIAN -> 7
+                    else -> 100
+                }
+            }
+            add(0, Locale.getDefault())
+        }
     }
 }

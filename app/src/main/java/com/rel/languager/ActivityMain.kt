@@ -105,9 +105,7 @@ class ActivityMain : AppCompatActivity() {
                     hasUnsavedChanges = true
 
                     // Refresh the adapter to show the updated language
-                    adapter.updateList(enabledApps)
-                    @SuppressLint("NotifyDataSetChanged")
-                    adapter.notifyDataSetChanged()
+                    adapter.updateList(enabledApps.changedFirst())
                 }
             }
         }
@@ -275,7 +273,7 @@ class ActivityMain : AppCompatActivity() {
                 }
 
                 enabledApps.clear()
-                enabledApps.addAll(enabledAppsList)
+                enabledApps.addAll(enabledAppsList.changedFirst())
 
                 if (enabledApps.isEmpty()) {
                     loadingProgress.visibility = View.GONE
@@ -313,10 +311,8 @@ class ActivityMain : AppCompatActivity() {
     }
 
     private fun filterApps(query: String?) {
-        val adapter = appListRecyclerView.adapter as? AppLanguageAdapter ?: return
-
         if (query.isNullOrBlank()) {
-            adapter.updateList(enabledApps)
+            adapter.updateList(enabledApps.changedFirst())
             return
         }
 
@@ -328,6 +324,14 @@ class ActivityMain : AppCompatActivity() {
             appName.contains(searchQuery) || packageName.contains(searchQuery)
         }
 
-        adapter.updateList(filteredApps)
+        adapter.updateList(filteredApps.changedFirst())
     }
+
+    fun List<ApplicationInfo>.changedFirst() =
+        sortedBy {
+            when (languageMappings[it.packageName]) {
+                null, Constants.DEFAULT_LANGUAGE -> 1
+                else -> 0
+            }
+        }
 }
