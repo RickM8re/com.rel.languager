@@ -1,8 +1,10 @@
 package com.rel.languager
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ApplicationInfo
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -11,6 +13,8 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
@@ -36,6 +40,7 @@ class ActivityMain : AppCompatActivity() {
     private lateinit var loadingProgress: ProgressBar
     private lateinit var noAppsText: TextView
     private lateinit var saveButton: Button
+    private lateinit var languageSelectionLauncher: ActivityResultLauncher<Intent?>
     private val enabledApps = mutableListOf<ApplicationInfo>()
     private val languageMappings = mutableMapOf<String, String>()
     private val mainScope = CoroutineScope(Dispatchers.Main)
@@ -48,9 +53,8 @@ class ActivityMain : AppCompatActivity() {
         // 框架绑定成功时触发
         override fun onServiceBind(service: XposedService) {
             mXposedService = service
-            pref = service.getRemotePreferences("SHARED_PREF_FILE_NAME")
+            pref = service.getRemotePreferences(Constants.SHARED_PREF_FILE_NAME)
             alertDialog.dismiss()
-            (appListRecyclerView.adapter as? AppLanguageAdapter)?.notifyDataSetChanged()
 
             runOnUiThread {
                 loadLanguageMappings()
@@ -73,6 +77,7 @@ class ActivityMain : AppCompatActivity() {
             .setMessage(R.string.module_not_enabled)
             .setPositiveButton(R.string.close) { _, _ -> finish() }
             .setCancelable(false).create()
+        initializeViews()
         XposedServiceHelper.registerListener(serviceListener)
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -85,10 +90,27 @@ class ActivityMain : AppCompatActivity() {
             }
         }
 
-        initializeViews()
         setupListeners()
 
         setupBackPressHandling()
+        languageSelectionLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            if (it.resultCode == RESULT_OK) {
+                it.data?.getStringExtra(LanguageSelectionActivity.RESULT_LANGUAGE_CODE)?.let { languageCode ->
+                    // Get the package name from the data
+                    val packageName =
+                        it.data?.getStringExtra(LanguageSelectionActivity.EXTRA_PACKAGE_NAME) ?: return@let
+
+                    // Update the language mapping
+                    languageMappings[packageName] = languageCode
+                    hasUnsavedChanges = true
+
+                    // Refresh the adapter to show the updated language
+                    adapter.updateList(enabledApps)
+                    @SuppressLint("NotifyDataSetChanged")
+                    adapter.notifyDataSetChanged()
+                }
+            }
+        }
     }
 
     private fun setupBackPressHandling() {
@@ -135,11 +157,18 @@ class ActivityMain : AppCompatActivity() {
             searchText?.apply {
                 setTextColor(ContextCompat.getColor(this@ActivityMain, android.R.color.white))
                 setHintTextColor(ContextCompat.getColor(this@ActivityMain, R.color.teal_200))
-                try {
-                    val cursorDrawableField = TextView::class.java.getDeclaredField("mCursorDrawableRes")
-                    cursorDrawableField.isAccessible = true
-                    cursorDrawableField.set(this, R.drawable.white_cursor)
-                } catch (e: Exception) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    this.setTextCursorDrawable(R.drawable.white_cursor)
+                } else {
+                    try {
+                        @SuppressLint("DiscouragedPrivateApi")
+                        val cursorDrawableField = TextView::class.java.getDeclaredField("mCursorDrawableRes")
+                        cursorDrawableField.isAccessible = true
+                        cursorDrawableField.set(this, R.drawable.white_cursor)
+                    } catch (e: Exception) {
+                        // 捕获异常以防止极个别魔改系统的设备崩溃
+                        e.printStackTrace()
+                    }
                 }
             }
 
@@ -223,7 +252,7 @@ class ActivityMain : AppCompatActivity() {
             ).show()
 
             hasUnsavedChanges = false
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Snackbar.make(
                 findViewById(R.id.root_view_for_snackbar),
                 R.string.error_saving_settings,
@@ -231,6 +260,8 @@ class ActivityMain : AppCompatActivity() {
             ).show()
         }
     }
+
+    private lateinit var adapter: AppLanguageAdapter
 
     private fun loadEnabledApps() {
         loadingProgress.visibility = View.VISIBLE
@@ -251,20 +282,18 @@ class ActivityMain : AppCompatActivity() {
                     noAppsText.visibility = View.VISIBLE
                     noAppsText.text = getString(R.string.no_apps_found)
                 } else {
-                    val adapter = AppLanguageAdapter(
+                    adapter = AppLanguageAdapter(
                         this@ActivityMain,
                         enabledApps,
-                        languageMappings
-                    ) { packageName, languageCode ->
-                        languageMappings[packageName] = languageCode
-                        hasUnsavedChanges = true
-                    }
+                        languageMappings,
+                        languageSelectionLauncher,
+                    )
 
                     appListRecyclerView.adapter = adapter
                     loadingProgress.visibility = View.GONE
                     appListRecyclerView.visibility = View.VISIBLE
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 loadingProgress.visibility = View.GONE
                 noAppsText.visibility = View.VISIBLE
                 noAppsText.text = getString(R.string.error_loading_apps)
@@ -300,23 +329,5 @@ class ActivityMain : AppCompatActivity() {
         }
 
         adapter.updateList(filteredApps)
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == AppLanguageAdapter.REQUEST_LANGUAGE_SELECTION && resultCode == RESULT_OK) {
-            data?.getStringExtra(LanguageSelectionActivity.RESULT_LANGUAGE_CODE)?.let { languageCode ->
-                // Get the package name from the data
-                val packageName = data.getStringExtra(LanguageSelectionActivity.EXTRA_PACKAGE_NAME) ?: return@let
-
-                // Update the language mapping
-                languageMappings[packageName] = languageCode
-                hasUnsavedChanges = true
-
-                // Refresh the adapter to show the updated language
-                (appListRecyclerView.adapter as? AppLanguageAdapter)?.notifyDataSetChanged()
-            }
-        }
     }
 }
